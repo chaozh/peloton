@@ -22,6 +22,7 @@ template <typename KeyType, typename ValueType, class KeyComparator, class KeyEq
 BWTreeIndex<KeyType, ValueType, KeyComparator, KeyEqualityChecker>::BWTreeIndex(
     IndexMetadata *metadata)
     : Index(metadata),
+      container(KeyComparator(metadata)), // 
       equals(metadata),
       comparator(metadata) {
   // Add your implementation here
@@ -36,14 +37,46 @@ template <typename KeyType, typename ValueType, class KeyComparator, class KeyEq
 bool BWTreeIndex<KeyType, ValueType, KeyComparator, KeyEqualityChecker>::InsertEntry(
     __attribute__((unused)) const storage::Tuple *key, __attribute__((unused)) const ItemPointer location) {
   // Add your implementation here
-  return false;
+  KeyType index_key;
+  index_key.SetFromKey(key);
+
+  // Insert the key, val pair
+  container.insert(std::pair<KeyType, ValueType>(index_key, location));
+
+  return true;
 }
 
 template <typename KeyType, typename ValueType, class KeyComparator, class KeyEqualityChecker>
 bool BWTreeIndex<KeyType, ValueType, KeyComparator, KeyEqualityChecker>::DeleteEntry(
     __attribute__((unused)) const storage::Tuple *key, __attribute__((unused)) const ItemPointer location) {
   // Add your implementation here
-  return false;
+  KeyType index_key;
+  index_key.SetFromKey(key);
+
+  // Delete the < key, location > pair
+  //container.erase(index_key);
+  bool try_again = true;
+  while (try_again == true) {
+    // Unset try again
+    try_again = false;
+
+    // Lookup matching entries
+    auto entries = container.equal_range(index_key);
+    for (auto iterator = entries.first; iterator != entries.second;
+        iterator++) {
+      ItemPointer value = iterator->second;
+
+      if ((value.block == location.block) &&
+          (value.offset == location.offset)) {
+        container.erase(iterator);
+        // Set try again
+        try_again = true;
+        break;
+      }
+    }
+  }
+
+  return true;
 }
 
 template <typename KeyType, typename ValueType, class KeyComparator, class KeyEqualityChecker>
@@ -63,6 +96,15 @@ std::vector<ItemPointer>
 BWTreeIndex<KeyType, ValueType, KeyComparator, KeyEqualityChecker>::ScanAllKeys() {
   std::vector<ItemPointer> result;
   // Add your implementation here
+  auto itr = container.begin();
+
+  // scan all entries
+  while (itr != container.end()) {
+    ItemPointer location = itr->second;
+    result.push_back(location);
+    itr++;
+  }
+  
   return result;
 }
 
@@ -75,6 +117,15 @@ BWTreeIndex<KeyType, ValueType, KeyComparator, KeyEqualityChecker>::ScanKey(
     __attribute__((unused)) const storage::Tuple *key) {
   std::vector<ItemPointer> result;
   // Add your implementation here
+  KeyType index_key;
+  index_key.SetFromKey(key);
+
+  // find the <key, location> pair
+  auto entries = container.equal_range(index_key);
+  for (auto entry = entries.first; entry != entries.second; ++entry) {
+    result.push_back(entry->second);
+  }
+
   return result;
 }
 
