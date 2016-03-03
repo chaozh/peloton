@@ -12,6 +12,16 @@
 
 #pragma once
 
+#include <algorithm>
+#include <functional>
+#include <istream>
+#include <ostream>
+#include <memory>
+#include <cstddef>
+#include <atomic>
+#include <vector>
+#include <assert.h>
+
 namespace peloton {
 namespace index {
 
@@ -24,15 +34,15 @@ class BWTree {
 public:
     //static const bool                   allow_duplicates = false;
     /// Typedef of our own type
-    typedef BWTree<KeyType, ValueType, KeyComparator, KeyEqualityChecker> btree_self;
+    using btree_self = BWTree<KeyType, ValueType, KeyComparator, KeyEqualityChecker>;
 
     /// Size type used to count keys
-    typedef size_t                              size_type;
+    using size_type = size_t;
 
     /// The pair of KeyType and ValueType.
-    typedef std::pair<KeyType, ValueType>      pair_type;
+    using pair_type = std::pair<KeyType, ValueType>;
 
-    typedef unsigned long                       PID;
+    using PID = unsigned long;
 
     // *** Iterators and Reverse Iterators
 
@@ -69,6 +79,9 @@ private:
         /// pointers
         unsigned short  slotuse;
 
+        Node() = delete;
+        ~Node() = delete;
+
         /// Delayed initialisation of constructed node
         inline void initialize(const unsigned short l)
         {
@@ -90,6 +103,9 @@ private:
 
         /// Pointers to children
         PID           childid[innerslotmax+1];
+
+        InnerNode() = delete;
+        ~InnerNode() = delete;
 
         /// Set variables to initial values
         inline void initialize(const unsigned short l)
@@ -129,6 +145,9 @@ private:
 
         /// Array of data
         DataType       slotdata[leafslotmax];
+
+        LeafNode() = delete;
+        ~LeafNode() = delete;
 
         /// Set variables to initial values
         inline void initialize()
@@ -175,17 +194,118 @@ private:
         }
     }
 
+    //delta record
+    enum class DeltaTypes: std::int8_t 
+    {
+        deltaInsert,
+        deltaDelete,
+        deltaUpdate,
+        deltaSplit
+    };
+
+    struct DeltaNode
+    {
+        DeltaTypes type;
+        Node* origin;
+
+        DeltaNode() = delete;
+        ~DeltaNode() = delete;
+
+        inline void initialize(DeltaTypes t)
+        {
+            type = t;
+            origin = NULL;
+        }
+    };
+
+    struct DeltaInsert: public DeltaNode
+    {
+        pair_type record;
+        
+        DeltaInsert() = delete;
+        ~DeltaInsert() = delete;
+
+        inline void initialize()
+        {
+            DeltaNode::initialize(DeltaTypes::deltaInsert);
+        }
+    };
+
+    struct DeltaDelete: public DeltaNode
+    {
+        KeyType key;
+
+        DeltaDelete() = delete;
+        ~DeltaDelete() = delete;
+
+        inline void initialize()
+        {
+            DeltaNode::initialize(DeltaTypes::deltaDelete);
+        }
+    };
+
+    struct DeltaUpdate: public DeltaNode
+    {
+        KeyType keyLeft;
+        KeyType keyRight;
+        PID child;
+        PID oldChild;
+
+        DeltaUpdate() = delete;
+        ~DeltaUpdate() = delete;
+
+        inline void initialize()
+        {
+            DeltaNode::initialize(DeltaTypes::deltaUpdate);
+        }
+    };
+
+    struct DeltaSplit: public DeltaNode
+    {
+        KeyType key;
+        PID sideLink;
+        size_type removedNodes;
+
+        DeltaSplit() = delete;
+        ~DeltaSplit() = delete;
+
+        inline void initialize()
+        {
+            DeltaNode::initialize(DeltaTypes::deltaSplit);
+        }
+    };
+
+    //epoch for thread to join
+    class Epoch 
+    {
+        std::atomic<uint64_t> currentEpoch{0};
+        //delete
+
+        //gc
+        size_type GCThreshHold;
+    public:
+        void enterEpoch();
+        void exitEpoch();
+        void markForGC();
+        void showGCRadio(); 
+    }
 
     // *** Tree Object Data Members
 
     /// Pointer to the B+ tree's root node, either leaf or inner node
-    PID   root_;
+    std::atomic<PID>   root_;
 
     /// Pointer to first leaf in the double linked leaf chain
-    PID   headleaf_;
+    std::atomic<PID>   headleaf_;
 
     /// Pointer to last leaf in the double linked leaf chain
-    PID   tailleaf_;
+    std::atomic<PID>   tailleaf_;
+
+    // Mapping Table with CAS
+    std::vector<std::atomic<Node*>> mapping{};
+
+    //epoch manager
+
 };
 
 }  // End index namespace
