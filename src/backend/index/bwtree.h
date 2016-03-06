@@ -57,10 +57,10 @@ public:
     {
         clear();
     }
-
+    
     /// Fast swapping of two identical B+ tree objects.
-    void swap(btree_self& from)
-
+    void swap(btree_self& from);
+    //op with thread info
     bool exists(const KeyType &key) const;
     iterator find(const KeyType &key);
     const_iterator find(const KeyType &key) const;
@@ -69,10 +69,11 @@ public:
     std::pair<iterator, bool> insert(const pair_type &);
     size_type erase(const KeyType &key);
 private:
+    void splitPage(const PID splitPage, const PID splitPageParent);
     // *** Node Classes for In-Memory Nodes
     struct Node
     {
-        /// Level in the b-tree, if level == 0 -> leaf node
+        /// Level in the b-tree, if level == 0 -> leaf Node
         unsigned short  level;
 
         /// Number of key slotuse use, so number of valid children or data
@@ -82,19 +83,19 @@ private:
         Node() = delete;
         ~Node() = delete;
 
-        /// Delayed initialisation of constructed node
+        /// Delayed initialisation of constructed Node
         inline void initialize(const unsigned short l)
         {
             level = l;
             slotuse = 0;
         }
 
-        /// True if this is a leaf node
-        inline bool isleafnode() const
+        /// True if this is a leaf Node
+        inline bool isLeafNode() const
         {
             return (level == 0);
         }
-    }
+    };
 
     struct InnerNode : public Node
     {
@@ -110,27 +111,27 @@ private:
         /// Set variables to initial values
         inline void initialize(const unsigned short l)
         {
-            node::initialize(l);
+            Node::initialize(l);
         }
 
-        /// True if the node's slots are full
-        inline bool isfull() const
+        /// True if the Node's slots are full
+        inline bool isFull() const
         {
-            return (node::slotuse == innerslotmax);
+            return (Node::slotuse == innerslotmax);
         }
 
         /// True if few used entries, less than half full
-        inline bool isfew() const
+        inline bool isFew() const
         {
-            return (node::slotuse <= mininnerslots);
+            return (Node::slotuse <= mininnerslots);
         }
 
-        /// True if node has too few entries
-        inline bool isunderflow() const
+        /// True if Node has too few entries
+        inline bool isUnderFlow() const
         {
-            return (node::slotuse < mininnerslots);
+            return (Node::slotuse < mininnerslots);
         }
-    }
+    };
 
     struct LeafNode : public Node
     {
@@ -144,7 +145,7 @@ private:
         KeyType        slotkey[leafslotmax];
 
         /// Array of data
-        DataType       slotdata[leafslotmax];
+        ValueType       slotdata[leafslotmax];
 
         LeafNode() = delete;
         ~LeafNode() = delete;
@@ -152,47 +153,47 @@ private:
         /// Set variables to initial values
         inline void initialize()
         {
-            node::initialize(0);
+            Node::initialize(0);
             prevleaf = nextleaf = NULL;
         }
 
-        /// True if the node's slots are full
-        inline bool isfull() const
+        /// True if the Node's slots are full
+        inline bool isFull() const
         {
-            return (node::slotuse == leafslotmax);
+            return (Node::slotuse == leafslotmax);
         }
 
         /// True if few used entries, less than half full
-        inline bool isfew() const
+        inline bool isFew() const
         {
-            return (node::slotuse <= minleafslots);
+            return (Node::slotuse <= minleafslots);
         }
 
-        /// True if node has too few entries
-        inline bool isunderflow() const
+        /// True if Node has too few entries
+        inline bool isUnderFlow() const
         {
-            return (node::slotuse < minleafslots);
+            return (Node::slotuse < minleafslots);
         }
 
         /// Set the (key,data) pair in slot. Overloaded function used by
         /// bulk_load().
-        inline void set_slot(unsigned short slot, const pair_type& value)
+        inline void setSlot(unsigned short slot, const pair_type& value)
         {
             assert(used_as_set == false);
-            assert(slot < node::slotuse);
+            assert(slot < Node::slotuse);
             slotkey[slot] = value.first;
             slotdata[slot] = value.second;
         }
 
         /// Set the key pair in slot. Overloaded function used by
         /// bulk_load().
-        inline void set_slot(unsigned short slot, const key_type& key)
+        inline void setSlot(unsigned short slot, const KeyType& key)
         {
             assert(used_as_set == true);
-            assert(slot < node::slotuse);
+            assert(slot < Node::slotuse);
             slotkey[slot] = key;
         }
-    }
+    };
 
     //delta record
     enum class DeltaTypes: std::int8_t 
@@ -275,12 +276,23 @@ private:
         }
     };
 
+    //make node vector for gc
+    class GCList
+    {
+        
+    };
+
+    class ThreadInfo
+    {
+    
+    };
+   
     //epoch for thread to join
     class Epoch 
     {
         std::atomic<uint64_t> currentEpoch{0};
-        //delete
-
+        //should be LTS for every thread
+        GCList gclist;
         //gc
         size_type GCThreshHold;
     public:
@@ -288,11 +300,11 @@ private:
         void exitEpoch();
         void markForGC();
         void showGCRadio(); 
-    }
+    };
 
     // *** Tree Object Data Members
 
-    /// Pointer to the B+ tree's root node, either leaf or inner node
+    /// Pointer to the B+ tree's root Node, either leaf or inner Node
     std::atomic<PID>   root_;
 
     /// Pointer to first leaf in the double linked leaf chain
@@ -304,7 +316,14 @@ private:
     // Mapping Table with CAS
     std::vector<std::atomic<Node*>> mapping{};
 
-    //epoch manager
+    //all epoch manager
+    Epoch epoch{64};
+
+private:
+    Node* getNodeByPID(PID pid)
+    {
+        return mapping[pid];
+    }
 
 };
 
