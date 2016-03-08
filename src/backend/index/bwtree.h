@@ -69,7 +69,6 @@ public:
     std::pair<iterator, bool> insert(const pair_type &);
     size_type erase(const KeyType &key);
 private:
-    void splitPage(const PID splitPage, const PID splitPageParent);
     // *** Node Classes for In-Memory Nodes
     struct Node
     {
@@ -281,11 +280,6 @@ private:
     {
         
     };
-
-    class ThreadInfo
-    {
-    
-    };
    
     //epoch for thread to join
     class Epoch 
@@ -296,10 +290,27 @@ private:
         //gc
         size_type GCThreshHold;
     public:
+        Epoche(size_type startGCThreshhold) : GCThreshHold(startGCThreshhold) { }
+        ~Epoche();
         void enterEpoch();
         void exitEpoch();
         void markForGC();
-        void showGCRadio(); 
+        void showGCRadio() {
+            //output some info about del
+        }
+    };
+
+    // 
+    class EpochGuard
+    {
+        Epoch &epoch;
+        EpochGuard(Epoch &epoch): epoch(epoch) {
+            epoch.enterEpoch();
+        }
+
+        ~EpochGuard() {
+            epoch.exitEpoch();
+        }
     };
 
     // *** Tree Object Data Members
@@ -318,6 +329,10 @@ private:
 
     //all epoch manager
     Epoch epoch{64};
+
+    void splitPage(const PID splitPage, const PID splitPageParent);
+    void consolidateLeafPage(const PID page, Node* startNode);
+    void consolidateInnerPage(const PID page, Node* startNode);
 
 private:
     Node* getNodeByPID(PID pid)
