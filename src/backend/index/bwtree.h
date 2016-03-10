@@ -70,7 +70,31 @@ public:
     size_type erase(const KeyType &key);
 private:
     // *** Node Classes for In-Memory Nodes
+    enum class NodeTypes: std::int8_t 
+    {
+        leafNode,
+        innerNode,
+        deltaInsert,
+        deltaDelete,
+        deltaUpdate,
+        deltaSplit
+    };
+
     struct Node
+    {
+        NodeTypes type;
+
+         Node() = delete;
+        ~Node() = delete;
+
+        /// Delayed initialisation of constructed Node
+        inline void initialize(NodeTypes t)
+        {
+            type = t;
+        }
+    }
+
+    struct BTNode: Node
     {
         /// Level in the b-tree, if level == 0 -> leaf Node
         unsigned short  level;
@@ -83,8 +107,9 @@ private:
         ~Node() = delete;
 
         /// Delayed initialisation of constructed Node
-        inline void initialize(const unsigned short l)
+        inline void initialize(NodeTypes t, const unsigned short l)
         {
+            Node::initialize(t);
             level = l;
             slotuse = 0;
         }
@@ -96,7 +121,7 @@ private:
         }
     };
 
-    struct InnerNode : public Node
+    struct InnerNode : public BTNode
     {
         /// Keys of children or data pointers
         KeyType        slotkey[innerslotmax];
@@ -110,29 +135,29 @@ private:
         /// Set variables to initial values
         inline void initialize(const unsigned short l)
         {
-            Node::initialize(l);
+            BTNode::initialize(NodeTypes::innerNode, l);
         }
 
         /// True if the Node's slots are full
         inline bool isFull() const
         {
-            return (Node::slotuse == innerslotmax);
+            return (BTNode::slotuse == innerslotmax);
         }
 
         /// True if few used entries, less than half full
         inline bool isFew() const
         {
-            return (Node::slotuse <= mininnerslots);
+            return (BTNode::slotuse <= mininnerslots);
         }
 
-        /// True if Node has too few entries
+        /// True if BTNode has too few entries
         inline bool isUnderFlow() const
         {
-            return (Node::slotuse < mininnerslots);
+            return (BTNode::slotuse < mininnerslots);
         }
     };
 
-    struct LeafNode : public Node
+    struct LeafNode : public BTNode
     {
         /// Double linked list pointers to traverse the leaves
         PID       prevleaf;
@@ -152,26 +177,26 @@ private:
         /// Set variables to initial values
         inline void initialize()
         {
-            Node::initialize(0);
+            BTNode::initialize(NodeTypes::LeafNode, 0);
             prevleaf = nextleaf = NULL;
         }
 
-        /// True if the Node's slots are full
+        /// True if the BTNode's slots are full
         inline bool isFull() const
         {
-            return (Node::slotuse == leafslotmax);
+            return (BTNode::slotuse == leafslotmax);
         }
 
         /// True if few used entries, less than half full
         inline bool isFew() const
         {
-            return (Node::slotuse <= minleafslots);
+            return (BTNode::slotuse <= minleafslots);
         }
 
-        /// True if Node has too few entries
+        /// True if BTNode has too few entries
         inline bool isUnderFlow() const
         {
-            return (Node::slotuse < minleafslots);
+            return (BTNode::slotuse < minleafslots);
         }
 
         /// Set the (key,data) pair in slot. Overloaded function used by
@@ -179,7 +204,7 @@ private:
         inline void setSlot(unsigned short slot, const pair_type& value)
         {
             assert(used_as_set == false);
-            assert(slot < Node::slotuse);
+            assert(slot < BTNode::slotuse);
             slotkey[slot] = value.first;
             slotdata[slot] = value.second;
         }
@@ -189,23 +214,14 @@ private:
         inline void setSlot(unsigned short slot, const KeyType& key)
         {
             assert(used_as_set == true);
-            assert(slot < Node::slotuse);
+            assert(slot < BTNode::slotuse);
             slotkey[slot] = key;
         }
     };
+    // delta record
 
-    //delta record
-    enum class DeltaTypes: std::int8_t 
+    struct DeltaNode: public Node
     {
-        deltaInsert,
-        deltaDelete,
-        deltaUpdate,
-        deltaSplit
-    };
-
-    struct DeltaNode
-    {
-        DeltaTypes type;
         Node* origin;
 
         DeltaNode() = delete;
@@ -213,7 +229,7 @@ private:
 
         inline void initialize(DeltaTypes t)
         {
-            type = t;
+            Node::initialize(t);
             origin = NULL;
         }
     };
@@ -278,7 +294,7 @@ private:
     //make node vector for gc
     class GCList
     {
-        
+        std::atomic<uint64_t> localEpoch{0};
     };
    
     //epoch for thread to join
@@ -286,15 +302,25 @@ private:
     {
         std::atomic<uint64_t> currentEpoch{0};
         //should be LTS for every thread
-        GCList gclist;
+        thread_local GCList gclist;
         //gc
         size_type GCThreshHold;
     public:
         Epoche(size_type startGCThreshhold) : GCThreshHold(startGCThreshhold) { }
         ~Epoche();
-        void enterEpoch();
-        void exitEpoch();
-        void markForGC();
+        void enterEpoch() {
+            unsigned long curEpoch = currentEpoch.load();
+            if(curEpoch != gclist.localEpoch.load()){
+                gclist.localEpoch.store(curEpoch);
+            }
+        }
+        void exitEpoch() {
+            currentEpoch.fetch_add(1);
+            //trigger gc
+        }
+        void markForGC(Node* node) {
+            gclist.add(node);
+        }
         void showGCRadio() {
             //output some info about del
         }
