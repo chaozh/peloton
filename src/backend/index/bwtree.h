@@ -297,19 +297,22 @@ private:
         std::atomic<uint64_t> localEpoch{0};
     };
    
-    //epoch for thread to join
+    //epoch for thread to join & used in consolidation
     class Epoch 
     {
         std::atomic<uint64_t> currentEpoch{0};
         //should be LTS for every thread
-        thread_local GCList gclist;
+        thread_local GCList gclists;
         //gc
         size_type GCThreshHold;
     public:
         Epoche(size_type startGCThreshhold) : GCThreshHold(startGCThreshhold) { }
         ~Epoche();
         void enterEpoch() {
+            //update epoch version
             unsigned long curEpoch = currentEpoch.load();
+            //fetch thread local gclist
+            auto 
             if(curEpoch != gclist.localEpoch.load()){
                 gclist.localEpoch.store(curEpoch);
             }

@@ -18,17 +18,17 @@ namespace index {
 	// Add your function definitions here
 	template<typename KeyType, typename ValueType>
 	bool BWTree::exists(const KeyType &key) const {
-
+		BWTree::EpochGuard(epoch);
 	}
 
 	template<typename KeyType, typename ValueType>
     BWTree::iterator BWTree::find(const KeyType &key) {
-
+    	BWTree::EpochGuard(epoch);
     }
     
     template<typename KeyType, typename ValueType>
     BWTree::const_iterator BWTree::find(const KeyType &key) const {
-
+    	BWTree::EpochGuard(epoch);
     }
 
     template<typename KeyType, typename ValueType>
@@ -38,12 +38,12 @@ namespace index {
 
     template<typename KeyType, typename ValueType>
     BWTree::pair_type insert(const BWTree::pair_type &) {
-
+    	BWTree::EpochGuard(epoch);
     }
 
     template<typename KeyType, typename ValueType>
     BWTree::size_type erase(const KeyType &key){
-
+    	BWTree::EpochGuard(epoch);
     }
 
 }  // End index namespace
