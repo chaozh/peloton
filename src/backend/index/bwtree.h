@@ -92,7 +92,7 @@ private:
         {
             type = t;
         }
-    }
+    };
 
     struct BTNode: Node
     {
@@ -103,8 +103,8 @@ private:
         /// pointers
         unsigned short  slotuse;
 
-        Node() = delete;
-        ~Node() = delete;
+        BTNode() = delete;
+        ~BTNode() = delete;
 
         /// Delayed initialisation of constructed Node
         inline void initialize(NodeTypes t, const unsigned short l)
@@ -227,7 +227,7 @@ private:
         DeltaNode() = delete;
         ~DeltaNode() = delete;
 
-        inline void initialize(DeltaTypes t)
+        inline void initialize(NodeTypes t)
         {
             Node::initialize(t);
             origin = NULL;
@@ -243,7 +243,7 @@ private:
 
         inline void initialize()
         {
-            DeltaNode::initialize(DeltaTypes::deltaInsert);
+            DeltaNode::initialize(NodeTypes::deltaInsert);
         }
     };
 
@@ -256,7 +256,7 @@ private:
 
         inline void initialize()
         {
-            DeltaNode::initialize(DeltaTypes::deltaDelete);
+            DeltaNode::initialize(NodeTypes::deltaDelete);
         }
     };
 
@@ -272,7 +272,7 @@ private:
 
         inline void initialize()
         {
-            DeltaNode::initialize(DeltaTypes::deltaUpdate);
+            DeltaNode::initialize(NodeTypes::deltaUpdate);
         }
     };
 
@@ -287,7 +287,7 @@ private:
 
         inline void initialize()
         {
-            DeltaNode::initialize(DeltaTypes::deltaSplit);
+            DeltaNode::initialize(NodeTypes::deltaSplit);
         }
     };
 
@@ -295,6 +295,10 @@ private:
     class GCList
     {
         std::atomic<uint64_t> localEpoch{0};
+        vector<*Node> list;
+
+        void add(Node*){}
+        void remove(Node*){}
     };
    
     //epoch for thread to join & used in consolidation
@@ -306,22 +310,24 @@ private:
         //gc
         size_type GCThreshHold;
     public:
-        Epoche(size_type startGCThreshhold) : GCThreshHold(startGCThreshhold) { }
-        ~Epoche();
+        Epoch(size_type startGCThreshhold) : GCThreshHold(startGCThreshhold) { }
+        ~Epoch();
         void enterEpoch() {
             //update epoch version
             unsigned long curEpoch = currentEpoch.load();
             //fetch thread local gclist
-            auto 
+            auto gclist = gclists.local(); 
             if(curEpoch != gclist.localEpoch.load()){
                 gclist.localEpoch.store(curEpoch);
             }
         }
         void exitEpoch() {
+            auto gclist = gclists.local();
             currentEpoch.fetch_add(1);
-            //trigger gc
+            //trigger gc and release all nodes under least epoch
         }
         void markForGC(Node* node) {
+            auto gclist = gclists.local();
             gclist.add(node);
         }
         void showGCRadio() {
@@ -356,7 +362,7 @@ private:
     // Mapping Table with CAS
     std::vector<std::atomic<Node*>> mapping{};
 
-    //all epoch manager
+    //all epoch manage
     Epoch epoch{64};
 
     void splitPage(const PID splitPage, const PID splitPageParent);
@@ -364,7 +370,7 @@ private:
     void consolidateInnerPage(const PID page, Node* startNode);
 
 private:
-    Node* getNodeByPID(PID pid)
+    atomic<Node*> getNodeByPID(PID pid)
     {
         return mapping[pid];
     }

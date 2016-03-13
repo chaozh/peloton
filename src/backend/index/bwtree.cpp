@@ -37,13 +37,40 @@ namespace index {
     }
 
     template<typename KeyType, typename ValueType>
-    BWTree::pair_type insert(const BWTree::pair_type &) {
+    BWTree::pair_type insert(const BWTree::pair_type &record) {
     	BWTree::EpochGuard(epoch);
+        //start insert
+        //find record page by key
+        auto page = findPage(record.first);
+        auto node = getNodeByPID(page->pid);
+        BWTree::DeltaInsert* newNode = BWTree::DeltaInsert::initialize(page, record);
+        if(!node.compare_exchange_weak(page, newNode)) {
+            freeNode(newNode);
+            //try again
+        }else{
+            //may split
+            //may consolidation
+        }
     }
 
     template<typename KeyType, typename ValueType>
     BWTree::size_type erase(const KeyType &key){
     	BWTree::EpochGuard(epoch);
+    }
+
+    template<typename KeyType, typename ValueType>
+    void splitPage(const PID splitPage, const PID splitPage) {
+    
+    }
+
+    template<typename KeyType, typename ValueType>
+    void consolidateLeafPage(const PID page, Node* startNode) {
+    
+    }
+    
+    template<typename KeyType, typename ValueType>
+    void consolidateInnerPage(const PID page, Node* startNode) {
+    
     }
 
 }  // End index namespace
