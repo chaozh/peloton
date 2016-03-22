@@ -44,6 +44,11 @@ public:
 
     using PID = unsigned long;
 
+    static const unsigned short SLOT_INNER_MAX = BTREE_NODE_SIZE / (sizeof(KeyType) + sizeof(PID));
+    static const unsigned short SLOT_LEAF_MAX = BTREE_NODE_SIZE / sizeof(ValueType);
+    static const unsigned short SLOT_INNER_MIN = SLOT_INNER_MAX / 2;
+    static const unsigned short SLOT_LEAF_MIN = SLOT_LEAF_MAX / 2;
+
     // *** Iterators and Reverse Iterators
 
     class iterator;
@@ -124,10 +129,10 @@ private:
     struct InnerNode : public BTNode
     {
         /// Keys of children or data pointers
-        KeyType        slotkey[innerslotmax];
+        KeyType        slotkey[SLOT_INNER_MAX];
 
         /// Pointers to children
-        PID           childid[innerslotmax+1];
+        PID           childid[SLOT_INNER_MAX+1];
 
         InnerNode() = delete;
         ~InnerNode() = delete;
@@ -141,19 +146,19 @@ private:
         /// True if the Node's slots are full
         inline bool isFull() const
         {
-            return (BTNode::slotuse == innerslotmax);
+            return (BTNode::slotuse == SLOT_INNER_MAX);
         }
 
         /// True if few used entries, less than half full
         inline bool isFew() const
         {
-            return (BTNode::slotuse <= mininnerslots);
+            return (BTNode::slotuse <= SLOT_INNER_MIN);
         }
 
         /// True if BTNode has too few entries
         inline bool isUnderFlow() const
         {
-            return (BTNode::slotuse < mininnerslots);
+            return (BTNode::slotuse < SLOT_INNER_MIN);
         }
     };
 
@@ -166,10 +171,10 @@ private:
         PID       nextleaf;
 
         /// Keys of children or data pointers
-        KeyType        slotkey[leafslotmax];
+        KeyType        slotkey[SLOT_LEAF_MAX];
 
         /// Array of data
-        ValueType       slotdata[leafslotmax];
+        ValueType       slotdata[SLOT_LEAF_MAX];
 
         LeafNode() = delete;
         ~LeafNode() = delete;
@@ -184,19 +189,19 @@ private:
         /// True if the BTNode's slots are full
         inline bool isFull() const
         {
-            return (BTNode::slotuse == leafslotmax);
+            return (BTNode::slotuse == SLOT_LEAF_MAX);
         }
 
         /// True if few used entries, less than half full
         inline bool isFew() const
         {
-            return (BTNode::slotuse <= minleafslots);
+            return (BTNode::slotuse <= SLOT_LEAF_MIN);
         }
 
         /// True if BTNode has too few entries
         inline bool isUnderFlow() const
         {
-            return (BTNode::slotuse < minleafslots);
+            return (BTNode::slotuse < SLOT_LEAF_MIN);
         }
 
         /// Set the (key,data) pair in slot. Overloaded function used by
@@ -295,7 +300,7 @@ private:
     class GCList
     {
         std::atomic<uint64_t> localEpoch{0};
-        vector<*Node> list;
+        std::vector<*Node> list;
 
         void add(Node*){}
         void remove(Node*){}
@@ -304,6 +309,7 @@ private:
     //epoch for thread to join & used in consolidation
     class Epoch 
     {
+    private:
         std::atomic<uint64_t> currentEpoch{0};
         //should be LTS for every thread
         thread_local GCList gclists;
@@ -370,7 +376,7 @@ private:
     void consolidateInnerPage(const PID page, Node* startNode);
 
 private:
-    atomic<Node*> getNodeByPID(PID pid)
+    std::atomic<Node*> getNodeByPID(PID pid)
     {
         return mapping[pid];
     }
