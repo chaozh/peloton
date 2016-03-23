@@ -39,7 +39,7 @@ namespace index {
     template<typename KeyType, typename ValueType>
     BWTree::pair_type BWTree::insert(const BWTree::pair_type &record) {
     	BWTree::EpochGuard(epoch);
-        //start insert
+        //start delete
         //find record page by key
         auto page = findPage(record.first);
         auto node = getNodeByPID(page->pid);
@@ -57,6 +57,17 @@ namespace index {
     template<typename KeyType, typename ValueType>
     BWTree::size_type BWTree::erase(const KeyType &key){
     	BWTree::EpochGuard(epoch);
+    	auto page = findPage(key);
+        auto node = getNodeByPID(page->pid);
+        BWTree::DeltaDelete* newNode = BWTree::DeltaDelete::initialize(page, key);
+        if(!node.compare_exchange_weak(page, newNode)) {
+            freeNode(newNode);
+            //try again
+        }else{
+            //may split
+            splitPage();
+            //may consolidation
+        }
     }
 
     template<typename KeyType, typename ValueType>
