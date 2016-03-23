@@ -71,7 +71,7 @@ public:
     const_iterator find(const KeyType &key) const;
     size_type count(const KeyType &key) const;
 
-    std::pair<iterator, bool> insert(const pair_type &);
+    std::pair<iterator, bool> insert(const pair_type &record);
     size_type erase(const KeyType &key);
 private:
     // *** Node Classes for In-Memory Nodes
@@ -296,14 +296,37 @@ private:
         }
     };
 
+    class DelNode
+    {
+        Node* node;
+        uint64_t epoch;
+        DelNode(Node* n, uint64_t e): node(n), epoch(e){}
+    };
+
     //make node vector for gc
     class GCList
     {
+    private:
         std::atomic<uint64_t> localEpoch{0};
-        std::vector<*Node> list;
+        std::vector<DelNode> list;
+    public:
+        size_type thresholdCounter{1};
+        uint64_t getLocalEpoch() {
+            return localEpoch.load();
+        }
 
-        void add(Node*){}
-        void remove(Node*){}
+        void setLocalEpoch(uint64_t epoch){
+            localEpoch.store(epoch);
+        }
+
+        void add(Node* n) {
+            DelNode delNode(n, localEpoch.load());
+            list.add(delNode);
+            thresholdCounter++;
+        }
+        void remove(vector<DelNode>::iterator &n) {
+            list.erase(it);
+        }
     };
    
     //epoch for thread to join & used in consolidation
@@ -323,14 +346,22 @@ private:
             unsigned long curEpoch = currentEpoch.load();
             //fetch thread local gclist
             auto gclist = gclists.local(); 
-            if(curEpoch != gclist.localEpoch.load()){
-                gclist.localEpoch.store(curEpoch);
+            if(curEpoch != gclist.getLocalEpoch()){
+                gclist.setLocalEpoch(curEpoch);
             }
         }
         void exitEpoch() {
             auto gclist = gclists.local();
+            //if(gclist.thresholdCounter & (64 - 1)) == 0)
             currentEpoch.fetch_add(1);
-            //trigger gc and release all nodes under least epoch
+            //trigger gc and release all nodes under oldest epoch
+            if (gclist.thresholdCounter > startGCThreshhold) {
+                for(auto it=gclist.begin(); it != gclist.end(); ++it)
+                    //if epoch is oldest
+                    gclist.remove(it);
+
+                gclist.thresholdCounter = 1;
+            }
         }
         void markForGC(Node* node) {
             auto gclist = gclists.local();
@@ -344,7 +375,9 @@ private:
     // 
     class EpochGuard
     {
+    private:
         Epoch &epoch;
+    public:
         EpochGuard(Epoch &epoch): epoch(epoch) {
             epoch.enterEpoch();
         }
@@ -353,7 +386,7 @@ private:
             epoch.exitEpoch();
         }
     };
-
+private:
     // *** Tree Object Data Members
 
     /// Pointer to the B+ tree's root Node, either leaf or inner Node
@@ -371,15 +404,15 @@ private:
     //all epoch manage
     Epoch epoch{64};
 
-    void splitPage(const PID splitPage, const PID splitPageParent);
-    void consolidateLeafPage(const PID page, Node* startNode);
-    void consolidateInnerPage(const PID page, Node* startNode);
-
-private:
     std::atomic<Node*> getNodeByPID(PID pid)
     {
         return mapping[pid];
     }
+    Node* findPage(const KeyType &key);
+public:
+    void splitPage(const PID splitPage, const PID splitPageParent);
+    void consolidateLeafPage(const PID page, Node* startNode);
+    void consolidateInnerPage(const PID page, Node* startNode);
 
 };
 

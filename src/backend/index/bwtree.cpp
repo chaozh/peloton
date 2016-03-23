@@ -32,12 +32,12 @@ namespace index {
     }
 
     template<typename KeyType, typename ValueType>
-    BWTree::size_type count(const KeyType &key) const {
+    BWTree::size_type BWTree::count(const KeyType &key) const {
 
     }
 
     template<typename KeyType, typename ValueType>
-    BWTree::pair_type insert(const BWTree::pair_type &record) {
+    BWTree::pair_type BWTree::insert(const BWTree::pair_type &record) {
     	BWTree::EpochGuard(epoch);
         //start insert
         //find record page by key
@@ -49,28 +49,39 @@ namespace index {
             //try again
         }else{
             //may split
+            splitPage();
             //may consolidation
         }
     }
 
     template<typename KeyType, typename ValueType>
-    BWTree::size_type erase(const KeyType &key){
+    BWTree::size_type BWTree::erase(const KeyType &key){
     	BWTree::EpochGuard(epoch);
     }
 
     template<typename KeyType, typename ValueType>
-    void splitPage(const PID splitPage, const PID splitPage) {
+    BWTree::Node* BWTree::findPage(const KeyType &key) {
+
+    }
+
+    template<typename KeyType, typename ValueType>
+    void BWTree::splitPage(const PID splitPage, const PID splitPageParent) {
     
     }
 
     template<typename KeyType, typename ValueType>
-    void consolidateLeafPage(const PID page, Node* startNode) {
+    void BWTree::consolidateLeafPage(const PID page, Node* startNode) {
     
     }
     
     template<typename KeyType, typename ValueType>
-    void consolidateInnerPage(const PID page, Node* startNode) {
+    void BWTree::consolidateInnerPage(const PID page, Node* startNode) {
     
+    }
+
+    template<typename KeyType, typename ValueType>
+    void BWTree::freeNode(Node* n){
+    	delete n;
     }
 
 }  // End index namespace
