@@ -34,13 +34,13 @@ class BWTree {
 public:
     //static const bool                   allow_duplicates = false;
     /// Typedef of our own type
-    using btree_self = BWTree<KeyType, ValueType, KeyComparator, KeyEqualityChecker>;
+    using BWtreeSelf = BWTree<KeyType, ValueType, KeyComparator, KeyEqualityChecker>;
 
     /// Size type used to count keys
-    using size_type = size_t;
+    using SizeType = size_t;
 
     /// The pair of KeyType and ValueType.
-    using pair_type = std::pair<KeyType, ValueType>;
+    using PairType = std::pair<KeyType, ValueType>;
 
     using PID = unsigned long;
 
@@ -64,15 +64,15 @@ public:
     }
     
     /// Fast swapping of two identical B+ tree objects.
-    void swap(btree_self& from);
+    void swap(BWtreeSelf& from);
     //op with thread info
     bool exists(const KeyType &key) const;
     iterator find(const KeyType &key);
     const_iterator find(const KeyType &key) const;
-    size_type count(const KeyType &key) const;
+    SizeType count(const KeyType &key) const;
 
-    std::pair<iterator, bool> insert(const pair_type &record);
-    size_type erase(const KeyType &key);
+    std::pair<iterator, bool> insert(const PairType &record);
+    SizeType erase(const KeyType &key);
 private:
     // *** Node Classes for In-Memory Nodes
     enum class NodeTypes: std::int8_t 
@@ -93,10 +93,8 @@ private:
         ~Node() = delete;
 
         /// Delayed initialisation of constructed Node
-        inline void initialize(NodeTypes t)
-        {
-            type = t;
-        }
+        Node(NodeTypes t): type(t)
+        { }
     };
 
     struct BTNode: Node
@@ -112,12 +110,9 @@ private:
         ~BTNode() = delete;
 
         /// Delayed initialisation of constructed Node
-        inline void initialize(NodeTypes t, const unsigned short l)
-        {
-            Node::initialize(t);
-            level = l;
-            slotuse = 0;
-        }
+        BTNode(NodeTypes t, const unsigned short l):
+            Node(t),level(l),slotuse(0)
+        { }
 
         /// True if this is a leaf Node
         inline bool isLeafNode() const
@@ -138,10 +133,9 @@ private:
         ~InnerNode() = delete;
 
         /// Set variables to initial values
-        inline void initialize(const unsigned short l)
-        {
-            BTNode::initialize(NodeTypes::innerNode, l);
-        }
+        inline void initialize(const unsigned short l): 
+            BTNode(NodeTypes::innerNode, l)
+        { }
 
         /// True if the Node's slots are full
         inline bool isFull() const
@@ -180,11 +174,11 @@ private:
         ~LeafNode() = delete;
 
         /// Set variables to initial values
-        inline void initialize()
-        {
-            BTNode::initialize(NodeTypes::LeafNode, 0);
-            prevleaf = nextleaf = NULL;
-        }
+        LeafNode(const PID &prev, const PID &next): 
+            BTNode(NodeTypes::LeafNode, 0), 
+            prevleaf(prev), 
+            nextleaf(next)
+        { }
 
         /// True if the BTNode's slots are full
         inline bool isFull() const
@@ -206,7 +200,7 @@ private:
 
         /// Set the (key,data) pair in slot. Overloaded function used by
         /// bulk_load().
-        inline void setSlot(unsigned short slot, const pair_type& value)
+        inline void setSlot(unsigned short slot, const PairType& value)
         {
             assert(used_as_set == false);
             assert(slot < BTNode::slotuse);
@@ -224,7 +218,7 @@ private:
         }
     };
     // delta record
-
+    // TODO: how to using vector to replace raw pointer link list
     struct DeltaNode: public Node
     {
         Node* origin;
@@ -232,24 +226,22 @@ private:
         DeltaNode() = delete;
         ~DeltaNode() = delete;
 
-        inline void initialize(NodeTypes t)
-        {
-            Node::initialize(t);
-            origin = NULL;
-        }
+        DeltaNode(NodeTypes t, Node* node):Node(t), origin(node)
+        { }
     };
 
     struct DeltaInsert: public DeltaNode
     {
-        pair_type record;
+        PairType record;
+        //we should deal with replicated key
         
         DeltaInsert() = delete;
         ~DeltaInsert() = delete;
 
-        inline void initialize()
-        {
-            DeltaNode::initialize(NodeTypes::deltaInsert);
-        }
+        DeltaInsert(Node* node, PairType r): 
+            DeltaNode(NodeTypes::deltaInsert, node), 
+            record(r)
+        { }
     };
 
     struct DeltaDelete: public DeltaNode
@@ -259,41 +251,42 @@ private:
         DeltaDelete() = delete;
         ~DeltaDelete() = delete;
 
-        inline void initialize()
-        {
-            DeltaNode::initialize(NodeTypes::deltaDelete);
-        }
+        DeltaDelete(Node* node, KeyType k): 
+            DeltaNode(NodeTypes::deltaDelete, node), 
+            key(k)
+        { }
     };
 
     struct DeltaUpdate: public DeltaNode
     {
-        KeyType keyLeft;
-        KeyType keyRight;
+        KeyType keyLeft; // greater than
+        KeyType keyRight; // lighter than
         PID child;
         PID oldChild;
 
         DeltaUpdate() = delete;
         ~DeltaUpdate() = delete;
 
-        inline void initialize()
-        {
-            DeltaNode::initialize(NodeTypes::deltaUpdate);
-        }
+        DeltaUpdate(Node* node, KeyType left, KeyType right, PID child, PID oldChild): 
+            DeltaNode(NodeTypes::deltaUpdate),
+            keyLeft(left), keyRight(right),
+            child(child), oldChild(oldChild)
+        { }
     };
 
     struct DeltaSplit: public DeltaNode
     {
         KeyType key;
         PID sideLink;
-        size_type removedNodes;
+        SizeType removedNums;
 
         DeltaSplit() = delete;
         ~DeltaSplit() = delete;
 
-        inline void initialize()
-        {
-            DeltaNode::initialize(NodeTypes::deltaSplit);
-        }
+        DeltaSplit(Node* node, KeyType k, PID sideLink, SizeType removedNums): 
+            DeltaNode(NodeTypes::deltaSplit), 
+            key(k), sideLink(sideLink), removedNums(removedNums)
+        { }
     };
 
     class DelNode
@@ -310,7 +303,7 @@ private:
         std::atomic<uint64_t> localEpoch{0};
         std::vector<DelNode> list;
     public:
-        size_type thresholdCounter{1};
+        SizeType thresholdCounter{1};
         uint64_t getLocalEpoch() {
             return localEpoch.load();
         }
@@ -320,6 +313,7 @@ private:
         }
 
         void add(Node* n) {
+            // TODO: race condition ?
             DelNode delNode(n, localEpoch.load());
             list.add(delNode);
             thresholdCounter++;
@@ -334,12 +328,12 @@ private:
     {
     private:
         std::atomic<uint64_t> currentEpoch{0};
-        //should be LTS for every thread
+        //TODO: should be LTS for every thread
         thread_local GCList gclists;
         //gc
-        size_type GCThreshHold;
+        SizeType GCThreshHold;
     public:
-        Epoch(size_type startGCThreshhold) : GCThreshHold(startGCThreshhold) { }
+        Epoch(SizeType startGCThreshhold) : GCThreshHold(startGCThreshhold) { }
         ~Epoch();
         void enterEpoch() {
             //update epoch version
@@ -358,6 +352,7 @@ private:
             if (gclist.thresholdCounter > startGCThreshhold) {
                 for(auto it=gclist.begin(); it != gclist.end(); ++it)
                     //if epoch is oldest
+                    // TODO: how to figure that oldest epoch out?
                     gclist.remove(it);
 
                 gclist.thresholdCounter = 1;

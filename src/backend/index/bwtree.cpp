@@ -92,7 +92,7 @@ namespace index {
 
     template<typename KeyType, typename ValueType>
     void BWTree::freeNode(Node* n){
-    	delete n;
+    	
     }
 
 }  // End index namespace
