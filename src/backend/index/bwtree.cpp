@@ -18,7 +18,11 @@ namespace index {
 	// Add your function definitions here
 	template<typename KeyType, typename ValueType>
 	bool BWTree::exists(const KeyType &key) const {
-		BWTree::EpochGuard(epoch);
+		if(find(key) != end()){
+			return true;
+		}else{
+			return false;
+		}
 	}
 
 	template<typename KeyType, typename ValueType>
@@ -43,9 +47,8 @@ namespace index {
         //find record page by key
         auto page = findPage(record.first);
         auto node = getNodeByPID(page->pid);
-        BWTree::DeltaInsert* newNode = BWTree::DeltaInsert::initialize(page, record);
+        BWTree::DeltaInsert* newNode = new BWTree::DeltaInsert(node, record);
         if(!node.compare_exchange_weak(page, newNode)) {
-            freeNode(newNode);
             //try again
         }else{
             //may split
@@ -59,7 +62,7 @@ namespace index {
     	BWTree::EpochGuard(epoch);
     	auto page = findPage(key);
         auto node = getNodeByPID(page->pid);
-        BWTree::DeltaDelete* newNode = BWTree::DeltaDelete::initialize(page, key);
+        BWTree::DeltaDelete* newNode = new BWTree::DeltaDelete(page, key);
         if(!node.compare_exchange_weak(page, newNode)) {
             freeNode(newNode);
             //try again

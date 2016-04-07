@@ -70,9 +70,12 @@ public:
     iterator find(const KeyType &key);
     const_iterator find(const KeyType &key) const;
     SizeType count(const KeyType &key) const;
-
+    //TODO: deal with update?
     std::pair<iterator, bool> insert(const PairType &record);
     SizeType erase(const KeyType &key);
+    //iterator
+    iterator end();
+    const_iterator end() const;
 private:
     // *** Node Classes for In-Memory Nodes
     enum class NodeTypes: std::int8_t 
@@ -396,7 +399,7 @@ private:
     // Mapping Table with CAS
     std::vector<std::atomic<Node*>> mapping{};
 
-    //all epoch manage
+    //all epoch manage 
     Epoch epoch{64};
 
     std::atomic<Node*> getNodeByPID(PID pid)
