@@ -25,14 +25,13 @@
 namespace peloton {
 namespace index {
 
-#define BTREE_NODE_SIZE  256
-
 // Look up the stx btree interface for background.
 // peloton/third_party/stx/btree.h
 template <typename KeyType, typename ValueType, typename KeyComparator, typename KeyEqualityChecker>
 class BWTree {
 public:
-    //static const bool                   allow_duplicates = false;
+    //static const bool                   
+    //AllowDuplicates = false;
     /// Typedef of our own type
     using BWtreeSelf = BWTree<KeyType, ValueType, KeyComparator, KeyEqualityChecker>;
 
@@ -43,11 +42,13 @@ public:
     using PairType = std::pair<KeyType, ValueType>;
 
     using PID = unsigned long;
+    constexpr PID MaxPID = std::numeric_limits<PID>::max();
 
-    static const unsigned short SLOT_INNER_MAX = BTREE_NODE_SIZE / (sizeof(KeyType) + sizeof(PID));
-    static const unsigned short SLOT_LEAF_MAX = BTREE_NODE_SIZE / sizeof(ValueType);
-    static const unsigned short SLOT_INNER_MIN = SLOT_INNER_MAX / 2;
-    static const unsigned short SLOT_LEAF_MIN = SLOT_LEAF_MAX / 2;
+    const int BTREE_NODE_SIZE = 256;
+    constexpr unsigned short SLOT_INNER_MAX = BTREE_NODE_SIZE / (sizeof(KeyType) + sizeof(PID));
+    constexpr unsigned short SLOT_LEAF_MAX = BTREE_NODE_SIZE / sizeof(ValueType);
+    constexpr unsigned short SLOT_INNER_MIN = SLOT_INNER_MAX / 2;
+    constexpr unsigned short SLOT_LEAF_MIN = SLOT_LEAF_MAX / 2;
 
     // *** Iterators and Reverse Iterators
 
@@ -73,6 +74,7 @@ public:
     //TODO: deal with update?
     std::pair<iterator, bool> insert(const PairType &record);
     SizeType erase(const KeyType &key);
+    SizeType erase(const PairType &record);
     //iterator
     iterator end();
     const_iterator end() const;
@@ -90,14 +92,17 @@ private:
 
     struct Node
     {
+private:
         NodeTypes type;
 
          Node() = delete;
         ~Node() = delete;
-
+public:
         /// Delayed initialisation of constructed Node
         Node(NodeTypes t): type(t)
         { }
+
+        NodeTypes getType() { return type; }
     };
 
     struct BTNode: Node
