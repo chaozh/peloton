@@ -20,7 +20,8 @@
 #include <cstddef>
 #include <atomic>
 #include <vector>
-#include <assert.h>
+#include <assert>
+#include "backend/common/logger.h"
 
 namespace peloton {
 namespace index {
@@ -84,6 +85,7 @@ private:
     {
         leafNode,
         innerNode,
+        // delta records
         deltaInsert,
         deltaDelete,
         deltaUpdate,
@@ -141,7 +143,7 @@ public:
         ~InnerNode() = delete;
 
         /// Set variables to initial values
-        inline void initialize(const unsigned short l): 
+        InnerNode(const unsigned short l): 
             BTNode(NodeTypes::innerNode, l)
         { }
 
@@ -344,6 +346,7 @@ public:
         Epoch(SizeType startGCThreshhold) : GCThreshHold(startGCThreshhold) { }
         ~Epoch();
         void enterEpoch() {
+            //LOG_DEBUG("thread %d enter epoch", );
             //update epoch version
             unsigned long curEpoch = currentEpoch.load();
             //fetch thread local gclist
@@ -356,6 +359,7 @@ public:
             auto gclist = gclists.local();
             //if(gclist.thresholdCounter & (64 - 1)) == 0)
             currentEpoch.fetch_add(1);
+            //LOG_DEBUG("thread %d exit epoch", );
             //trigger gc and release all nodes under oldest epoch
             if (gclist.thresholdCounter > startGCThreshhold) {
                 for(auto it=gclist.begin(); it != gclist.end(); ++it)
@@ -369,6 +373,7 @@ public:
         void markForGC(Node* node) {
             auto gclist = gclists.local();
             gclist.add(node);
+            LOG_INFO("Nested loop join executor -- %d children", num_children);
         }
         void showGCRadio() {
             //output some info about del

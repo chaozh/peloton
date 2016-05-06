@@ -85,30 +85,45 @@ namespace index {
     template<typename KeyType, typename ValueType>
     BWTree::Node* BWTree::findPage(const KeyType &key) {
         PID nextPID = root_.load();
-        //go through tree
-        while(nextPID != MaxPID){
-            Node *nextNode = getNodeByPID(nextPID);
+        Node *nextNode = getNodeByPID(nextPID).load();
+        //go through tree & nextPID != MaxPID
+        while(nextNode != nullptr){
             if (isLeaf(nextNode)) {
                 break;
             }
-            if(nextNode != nullptr){
-                switch(nextNode->getType()){
-                    case NodeTypes::deltaUpdate:{
-                        auto n = static_cast<DeltaUpdate*>(nextNode);
 
-                    };
+            switch(nextNode->getType()) {
+                case NodeTypes::deltaUpdate: {
+                    auto n = static_cast<DeltaUpdate*>(nextNode);
+                    if(key > n->keyLeft && key <= n->keyRight){
+                        nextPID = n->child;
+                        nextNode = nullptr;
+                        break;
+                    } else {
+                        nextNode = n->origin;
+                    }
+                };
 
-                    case NodeTypes::innerNode:{
-                        auto n = static_cast<InnerNode*>(nextNode);
-                    };
+                case NodeTypes::innerNode: {
+                    auto n = static_cast<InnerNode*>(nextNode);
+                    //search for key
+                };
 
-                    case NodeTypes::deltaSplit:{
-                        auto n = static_cast<DeltaSplit*>(nextNode);
-                    };
-                }
+                case NodeTypes::deltaSplit: { // parent update
+                    auto n = static_cast<DeltaSplit*>(nextNode);
+                    if (key > n->key) {
+                        nextPID = n->sidelink;
+                        nextNode = nullptr;
+                        doNotSplit = true;
+                    }else{
+                        nextNode = n->origin;
+                        assert(nextNode != nullptr);
+                    }
+                    break;
+                };
             }
-
-        }
+        } //end of while
+        Node *nextNode = getNodeByPID(nextPID);
         //deal with data
         while(nextPID != MaxPID){
             Node *nextNode = getNodeByPID(nextPID);
@@ -127,12 +142,13 @@ namespace index {
                         auto n = static_cast<DeltaDelete*>(nextNode);
                     };
 
-                    case NodeTypes::deltaSplit:{
+                    case NodeTypes::deltaSplit:{ //child split
                         auto n = static_cast<DeltaSplit*>(nextNode);
                     };
                 }
             }
-        }
+        }// end of while
+
         //may find many results
     }
 
