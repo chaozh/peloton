@@ -233,6 +233,19 @@ public:
         return tree.get_allocator();
     }
 
+<<<<<<< HEAD
+=======
+    // Enabled persistence
+    void set_persistence_mode(const bool is_durable_) {
+      tree.set_persistence_mode(is_durable_);
+    }
+
+    // Set backend type
+    void set_backend_type(peloton::BackendType backend_type_) {
+      tree.set_backend_type(backend_type_);
+    }
+
+>>>>>>> b9c7d00b67b46539d04026c8c51809ded7bbee63
 public:
     // *** Fast Destruction of the B+ Tree
 

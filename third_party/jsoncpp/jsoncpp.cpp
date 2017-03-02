@@ -3382,7 +3382,11 @@ Path::makePath( const std::string &path,
 
 
 void 
+<<<<<<< HEAD
 Path::addPathInArg( const std::string &path, 
+=======
+Path::addPathInArg( const std::string &,
+>>>>>>> b9c7d00b67b46539d04026c8c51809ded7bbee63
                     const InArgs &in, 
                     InArgs::const_iterator &itInArg, 
                     PathArgument::Kind kind )
@@ -3403,8 +3407,13 @@ Path::addPathInArg( const std::string &path,
 
 
 void 
+<<<<<<< HEAD
 Path::invalidPath( const std::string &path, 
                    int location )
+=======
+Path::invalidPath( const std::string &,
+                   int )
+>>>>>>> b9c7d00b67b46539d04026c8c51809ded7bbee63
 {
    // Error: invalid path.
 }
